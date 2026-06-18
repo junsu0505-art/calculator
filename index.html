@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>계산기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ===== 전역 리셋 & 기본 ===== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 32px 16px;
+      font-family: 'Roboto', 'Google Sans', -apple-system, 'Segoe UI', sans-serif;
+    }
+
+    /* ===== 메인 레이아웃 ===== */
+    .app-wrapper {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    /* ===== 계산기 카드 ===== */
+    .calculator {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+      overflow: hidden;
+      flex-shrink: 0;
+      width: 320px;
+    }
+
+    /* ===== 디스플레이 ===== */
+    .display {
+      background: #f1f3f4;
+      padding: 20px 24px 16px;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+    }
+
+    /* 메모리 인디케이터 */
+    .memory-indicator {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #4285F4;
+      letter-spacing: 0.5px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .memory-indicator.visible {
+      opacity: 1;
+    }
+
+    /* 이전 수식 (작은 글씨) */
+    .expression {
+      font-size: 14px;
+      color: #5f6368;
+      text-align: right;
+      min-height: 20px;
+      word-break: break-all;
+      margin-bottom: 4px;
+      transition: opacity 0.15s;
+    }
+
+    /* 현재 값 (큰 글씨) */
+    .current-value {
+      font-size: 40px;
+      font-weight: 300;
+      color: #202124;
+      text-align: right;
+      line-height: 1.1;
+      word-break: break-all;
+      transition: font-size 0.1s;
+    }
+    .current-value.small {
+      font-size: 28px;
+    }
+    .current-value.xsmall {
+      font-size: 20px;
+    }
+
+    /* ===== 버튼 그리드 ===== */
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: #dadce0;
+    }
+
+    /* 버튼 기본 스타일 */
+    .btn {
+      background: #ffffff;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 400;
+      padding: 0;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.08s, transform 0.06s;
+      color: #202124;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+
+    .btn:hover {
+      background: #f1f3f4;
+    }
+    .btn:active, .btn.active-flash {
+      background: #e8eaed;
+      transform: scale(0.95);
+    }
+
+    /* 메모리 버튼 행 */
+    .btn.memory {
+      font-size: 14px;
+      font-weight: 500;
+      color: #5f6368;
+      background: #f8f9fa;
+    }
+    .btn.memory:hover {
+      background: #f1f3f4;
+    }
+    .btn.memory:active {
+      background: #e8eaed;
+    }
+
+    /* 연산자 버튼 (오렌지) */
+    .btn.operator {
+      background: #e8f0fe;
+      color: #4285F4;
+      font-weight: 500;
+    }
+    .btn.operator:hover {
+      background: #d2e3fc;
+    }
+    .btn.operator:active, .btn.operator.active-flash {
+      background: #aecbfa;
+    }
+
+    /* 등호 버튼 */
+    .btn.equals {
+      background: #4285F4;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .btn.equals:hover {
+      background: #3367d6;
+    }
+    .btn.equals:active, .btn.equals.active-flash {
+      background: #2a56c6;
+    }
+
+    /* 기능 버튼 (C, ±, %) */
+    .btn.function {
+      background: #f1f3f4;
+      color: #202124;
+      font-weight: 500;
+    }
+    .btn.function:hover {
+      background: #e8eaed;
+    }
+    .btn.function:active, .btn.function.active-flash {
+      background: #dadce0;
+    }
+
+    /* ===== 기록 패널 ===== */
+    .history-panel {
+      flex: 1;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .history-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #dadce0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #4285F4;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .history-clear-btn {
+      font-size: 12px;
+      color: #4285F4;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 6px;
+      transition: background 0.1s;
+    }
+    .history-clear-btn:hover {
+      background: #e8f0fe;
+    }
+
+    .history-list {
+      list-style: none;
+      max-height: 420px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .history-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .history-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .history-list::-webkit-scrollbar-thumb {
+      background: #dadce0;
+      border-radius: 2px;
+    }
+
+    .history-item {
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background 0.1s;
+      border-radius: 8px;
+      margin: 2px 8px;
+    }
+    .history-item:hover {
+      background: #f1f3f4;
+    }
+    .history-item:active {
+      background: #e8eaed;
+    }
+
+    .history-expr {
+      font-size: 12px;
+      color: #5f6368;
+      margin-bottom: 2px;
+    }
+    .history-result {
+      font-size: 18px;
+      font-weight: 500;
+      color: #202124;
+      text-align: right;
+    }
+
+    .history-empty {
+      padding: 32px 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #9aa0a6;
+    }
+
+    /* ===== 반응형 ===== */
+    @media (max-width: 600px) {
+      body {
+        padding: 16px 8px;
+        align-items: flex-start;
+      }
+
+      .app-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        max-width: 100%;
+      }
+
+      .calculator {
+        width: 100%;
+      }
+
+      .history-panel {
+        width: 100%;
+      }
+
+      .history-list {
+        max-height: 220px;
+      }
+
+      .btn {
+        height: 60px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- ===== 계산기 ===== -->
+  <div class="calculator">
+    <div class="display">
+      <span class="memory-indicator" id="memIndicator">M</span>
+      <div class="expression" id="expression"></div>
+      <div class="current-value" id="currentValue">0</div>
+    </div>
+
+    <div class="buttons">
+      <!-- 행1: 메모리 -->
+      <button class="btn memory" data-action="mc"   aria-label="메모리 초기화">MC</button>
+      <button class="btn memory" data-action="mr"   aria-label="메모리 불러오기">MR</button>
+      <button class="btn memory" data-action="mplus" aria-label="메모리에 더하기">M+</button>
+      <button class="btn memory" data-action="mminus" aria-label="메모리에서 빼기">M−</button>
+
+      <!-- 행2: 기능 + 나누기 -->
+      <button class="btn function" data-action="clear"   aria-label="전체 초기화">C</button>
+      <button class="btn function" data-action="toggle"  aria-label="부호 변경">±</button>
+      <button class="btn function" data-action="percent" aria-label="퍼센트">%</button>
+      <button class="btn operator" data-action="operator" data-op="÷" aria-label="나누기">÷</button>
+
+      <!-- 행3: 7 8 9 × -->
+      <button class="btn digit" data-digit="7">7</button>
+      <button class="btn digit" data-digit="8">8</button>
+      <button class="btn digit" data-digit="9">9</button>
+      <button class="btn operator" data-action="operator" data-op="×" aria-label="곱하기">×</button>
+
+      <!-- 행4: 4 5 6 - -->
+      <button class="btn digit" data-digit="4">4</button>
+      <button class="btn digit" data-digit="5">5</button>
+      <button class="btn digit" data-digit="6">6</button>
+      <button class="btn operator" data-action="operator" data-op="−" aria-label="빼기">−</button>
+
+      <!-- 행5: 1 2 3 + -->
+      <button class="btn digit" data-digit="1">1</button>
+      <button class="btn digit" data-digit="2">2</button>
+      <button class="btn digit" data-digit="3">3</button>
+      <button class="btn operator" data-action="operator" data-op="+" aria-label="더하기">+</button>
+
+      <!-- 행6: 0 . ⌫ = -->
+      <button class="btn digit" data-digit="0">0</button>
+      <button class="btn function" data-action="decimal" aria-label="소수점">.</button>
+      <button class="btn function" data-action="backspace" aria-label="지우기">⌫</button>
+      <button class="btn equals" data-action="evaluate" aria-label="계산">=</button>
+    </div>
+  </div>
+
+  <!-- ===== 기록 패널 ===== -->
+  <div class="history-panel">
+    <div class="history-header">
+      <span class="history-title">기록</span>
+      <button class="history-clear-btn" id="historyClearBtn">지우기</button>
+    </div>
+    <ul class="history-list" id="historyList">
+      <li class="history-empty" id="historyEmpty">계산 기록이 없습니다</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  /* ============================================================
+     상태(State) — 상태 머신 패턴
+  ============================================================ */
+  let state = {
+    currentInput:   '0',      // 현재 입력 중인 값(문자열)
+    previousInput:  '',       // 이전 피연산자(문자열)
+    operator:       null,     // 선택된 연산자 (+, −, ×, ÷)
+    memory:         0,        // 메모리 저장값
+    history:        [],       // 계산 기록 배열 [{expr, result}]
+    justEvaluated:  false,    // = 직후 상태 여부
+    isError:        false,    // 오류 상태 여부
+    expressionStr:  '',       // 디스플레이 상단 수식 문자열
+  };
+
+  /* ============================================================
+     DOM 참조
+  ============================================================ */
+  const elExpression  = document.getElementById('expression');
+  const elCurrent     = document.getElementById('currentValue');
+  const elMemInd      = document.getElementById('memIndicator');
+  const elHistoryList = document.getElementById('historyList');
+  const elHistoryEmpty= document.getElementById('historyEmpty');
+
+  /* ============================================================
+     유틸리티
+  ============================================================ */
+
+  /** 부동소수점 오차 보정 반올림 */
+  function fixFloat(n) {
+    return Math.round(n * 1e12) / 1e12;
+  }
+
+  /** 숫자 → 표시용 문자열 (자릿수 제한) */
+  function formatNumber(val) {
+    if (typeof val === 'string') return val; // '오류' 등 문자열 그대로
+
+    const abs = Math.abs(val);
+    // 정수이면서 자릿수 12 이하인 경우 그대로 표시
+    if (Number.isInteger(val) && abs < 1e12) {
+      return val.toString();
+    }
+    // 유효숫자 12자리로 제한
+    const s = parseFloat(val.toPrecision(12)).toString();
+    return s;
+  }
+
+  /** 현재 값 숫자로 변환 */
+  function currentAsNumber() {
+    const n = parseFloat(state.currentInput);
+    return isNaN(n) ? 0 : n;
+  }
+
+  /* ============================================================
+     렌더링
+  ============================================================ */
+
+  /** 디스플레이 갱신 */
+  function renderDisplay() {
+    const val = state.currentInput;
+
+    // 글씨 크기 조절 (문자열 길이에 따라)
+    const len = val.length;
+    elCurrent.classList.remove('small', 'xsmall');
+    if (len > 14)      elCurrent.classList.add('xsmall');
+    else if (len > 9)  elCurrent.classList.add('small');
+
+    elCurrent.textContent = val;
+    elExpression.textContent = state.expressionStr;
+
+    // 메모리 인디케이터
+    if (state.memory !== 0) {
+      elMemInd.classList.add('visible');
+    } else {
+      elMemInd.classList.remove('visible');
+    }
+  }
+
+  /** 기록 목록 갱신 */
+  function renderHistory() {
+    // 빈 상태 메시지 토글
+    if (state.history.length === 0) {
+      elHistoryEmpty.style.display = '';
+    } else {
+      elHistoryEmpty.style.display = 'none';
+    }
+
+    // 기존 기록 항목 모두 제거 후 재생성
+    const items = elHistoryList.querySelectorAll('.history-item');
+    items.forEach(el => el.remove());
+
+    // 최신순 (배열 역순)
+    [...state.history].reverse().forEach((entry) => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      li.innerHTML = `
+        <div class="history-expr">${entry.expr}</div>
+        <div class="history-result">${formatNumber(entry.result)}</div>
+      `;
+      // 클릭 시 결과값 재사용
+      li.addEventListener('click', () => {
+        recallHistoryResult(entry.result);
+      });
+      elHistoryList.insertBefore(li, elHistoryList.querySelector('.history-empty'));
+    });
+  }
+
+  /* ============================================================
+     핵심 동작 함수
+  ============================================================ */
+
+  /** 오류 상태 설정 */
+  function setError(msg) {
+    state.isError       = true;
+    state.currentInput  = msg || '오류';
+    state.expressionStr = '';
+    state.operator      = null;
+    state.previousInput = '';
+    renderDisplay();
+  }
+
+  /** 오류 또는 justEvaluated 상태에서 숫자 입력 시 리셋 */
+  function resetIfNeeded() {
+    if (state.isError) {
+      state.isError       = false;
+      state.currentInput  = '0';
+      state.expressionStr = '';
+    }
+  }
+
+  /** 숫자 입력 */
+  function inputDigit(digit) {
+    resetIfNeeded();
+
+    // = 직후 새 숫자 입력: 완전 초기화 후 입력
+    if (state.justEvaluated) {
+      state.justEvaluated = false;
+      state.operator      = null;
+      state.previousInput = '';
+      state.expressionStr = '';
+      state.currentInput  = digit === '0' ? '0' : digit;
+      renderDisplay();
+      return;
+    }
+
+    // 현재 입력이 '0' 단독이면 교체 (단, 0.x는 허용)
+    if (state.currentInput === '0' && digit !== '.') {
+      state.currentInput = digit;
+    } else if (state.currentInput.length < 20) {
+      // 최대 20자리 제한
+      state.currentInput += digit;
+    }
+
+    renderDisplay();
+  }
+
+  /** 소수점 입력 */
+  function inputDecimal() {
+    resetIfNeeded();
+
+    // = 직후 소수점 입력 → "0."으로 시작
+    if (state.justEvaluated) {
+      state.justEvaluated = false;
+      state.operator      = null;
+      state.previousInput = '';
+      state.expressionStr = '';
+      state.currentInput  = '0.';
+      renderDisplay();
+      return;
+    }
+
+    // 이미 소수점이 있으면 무시
+    if (state.currentInput.includes('.')) return;
+    state.currentInput += '.';
+    renderDisplay();
+  }
+
+  /** 연산자 선택 */
+  function chooseOperator(op) {
+    if (state.isError) return;
+
+    // 빈 입력에서 연산자만 입력 → 0 기준으로 처리
+    if (state.currentInput === '' || state.currentInput === '0' && state.previousInput === '' && state.operator === null) {
+      // 이미 operator 중간 상태가 아니면 0으로 설정
+    }
+
+    // 이전 연산이 미완료 상태에서 새 연산자 입력 → 연산자 교체
+    if (state.operator && !state.justEvaluated && state.currentInput === '') {
+      state.operator      = op;
+      state.expressionStr = formatNumber(parseFloat(state.previousInput)) + ' ' + op;
+      renderDisplay();
+      return;
+    }
+
+    // = 직후 연산자 입력 → 결과값에 이어서 계산
+    if (state.justEvaluated) {
+      state.justEvaluated = false;
+    }
+
+    // 이전 연산자가 있고 currentInput이 입력된 경우 → 중간 계산
+    if (state.operator && state.currentInput !== '') {
+      compute(false); // 중간 계산 (기록 추가 X)
+    }
+
+    state.previousInput = state.currentInput !== '' ? state.currentInput : (state.previousInput || '0');
+    state.currentInput  = '';
+    state.operator      = op;
+    state.expressionStr = formatNumber(parseFloat(state.previousInput)) + ' ' + op;
+    renderDisplay();
+  }
+
+  /** 실제 연산 수행
+   *  @param {boolean} addHistory - 기록에 추가할지 여부
+   */
+  function compute(addHistory) {
+    if (!state.operator) return;
+
+    const prev = parseFloat(state.previousInput);
+    const curr = parseFloat(state.currentInput !== '' ? state.currentInput : state.previousInput);
+
+    if (isNaN(prev) || isNaN(curr)) {
+      setError('오류');
+      return;
+    }
+
+    let result;
+    switch (state.operator) {
+      case '+': result = prev + curr; break;
+      case '−': result = prev - curr; break;
+      case '×': result = prev * curr; break;
+      case '÷':
+        if (curr === 0) {
+          setError('오류');
+          return;
+        }
+        result = prev / curr;
+        break;
+      default:
+        return;
+    }
+
+    // 부동소수점 오차 보정
+    result = fixFloat(result);
+
+    // Infinity / NaN / overflow 처리
+    if (!isFinite(result) || isNaN(result)) {
+      setError('오류');
+      return;
+    }
+
+    if (addHistory) {
+      const exprText = `${formatNumber(prev)} ${state.operator} ${formatNumber(curr)}`;
+      state.history.push({ expr: exprText + ' =', result });
+      state.expressionStr = exprText + ' =';
+    }
+
+    state.currentInput  = formatNumber(result);
+    state.previousInput = '';
+    state.operator      = null;
+    return result;
+  }
+
+  /** = 버튼: 최종 계산 */
+  function evaluate() {
+    if (state.isError) {
+      clearAll();
+      return;
+    }
+
+    // 피연산자나 연산자가 없으면 무시
+    if (!state.operator) return;
+    if (state.currentInput === '' && state.previousInput === '') return;
+
+    // currentInput 없으면 previousInput 재사용 (예: 5 + = → 10)
+    compute(true);
+
+    state.justEvaluated = true;
+    renderDisplay();
+    renderHistory();
+  }
+
+  /** 전체 초기화 (C) */
+  function clearAll() {
+    state.currentInput  = '0';
+    state.previousInput = '';
+    state.operator      = null;
+    state.justEvaluated = false;
+    state.isError       = false;
+    state.expressionStr = '';
+    renderDisplay();
+  }
+
+  /** 백스페이스: 마지막 자리 삭제 */
+  function backspace() {
+    if (state.isError) { clearAll(); return; }
+    if (state.justEvaluated) return; // 계산 결과에서는 무시
+
+    if (state.currentInput.length <= 1) {
+      state.currentInput = '0';
+    } else {
+      state.currentInput = state.currentInput.slice(0, -1);
+    }
+    renderDisplay();
+  }
+
+  /** 부호 변경 (±) */
+  function toggleSign() {
+    if (state.isError) return;
+    const n = currentAsNumber();
+    if (n === 0) return;
+    const toggled = fixFloat(n * -1);
+    state.currentInput = formatNumber(toggled);
+    renderDisplay();
+  }
+
+  /** 퍼센트 (%) */
+  function percent() {
+    if (state.isError) return;
+    const n = currentAsNumber();
+
+    let result;
+    // 연산자가 있는 경우: previousInput 기준 백분율
+    if (state.operator && state.previousInput !== '') {
+      const prev = parseFloat(state.previousInput);
+      result = fixFloat((prev * n) / 100);
+    } else {
+      result = fixFloat(n / 100);
+    }
+
+    if (!isFinite(result)) { setError('오류'); return; }
+    state.currentInput = formatNumber(result);
+    renderDisplay();
+  }
+
+  /** 메모리: 더하기 (M+) */
+  function memoryAdd() {
+    if (state.isError) return;
+    state.memory = fixFloat(state.memory + currentAsNumber());
+    renderDisplay();
+  }
+
+  /** 메모리: 빼기 (M−) */
+  function memorySubtract() {
+    if (state.isError) return;
+    state.memory = fixFloat(state.memory - currentAsNumber());
+    renderDisplay();
+  }
+
+  /** 메모리: 불러오기 (MR) */
+  function memoryRecall() {
+    if (state.isError) return;
+    state.currentInput  = formatNumber(state.memory);
+    state.justEvaluated = false;
+    renderDisplay();
+  }
+
+  /** 메모리: 초기화 (MC) */
+  function memoryClear() {
+    state.memory = 0;
+    renderDisplay();
+  }
+
+  /** 기록 항목 결과값 불러오기 */
+  function recallHistoryResult(result) {
+    state.currentInput  = formatNumber(result);
+    state.justEvaluated = true;
+    state.isError       = false;
+    renderDisplay();
+  }
+
+  /* ============================================================
+     이벤트 핸들러
+  ============================================================ */
+
+  /** 버튼 클릭 */
+  document.querySelector('.buttons').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const digit  = btn.dataset.digit;
+    const op     = btn.dataset.op;
+
+    if (digit !== undefined) {
+      inputDigit(digit);
+    } else {
+      switch (action) {
+        case 'decimal':  inputDecimal();    break;
+        case 'operator': chooseOperator(op); break;
+        case 'evaluate': evaluate();         break;
+        case 'clear':    clearAll();         break;
+        case 'backspace':backspace();         break;
+        case 'toggle':   toggleSign();       break;
+        case 'percent':  percent();          break;
+        case 'mc':       memoryClear();      break;
+        case 'mr':       memoryRecall();     break;
+        case 'mplus':    memoryAdd();        break;
+        case 'mminus':   memorySubtract();   break;
+      }
+    }
+  });
+
+  /** 기록 지우기 버튼 */
+  document.getElementById('historyClearBtn').addEventListener('click', () => {
+    state.history = [];
+    renderHistory();
+  });
+
+  /* ============================================================
+     키보드 입력 지원
+  ============================================================ */
+
+  /** 키에 해당하는 버튼 DOM 요소 찾기 */
+  function findButtonByKey(key) {
+    const map = {
+      '0': '[data-digit="0"]',
+      '1': '[data-digit="1"]',
+      '2': '[data-digit="2"]',
+      '3': '[data-digit="3"]',
+      '4': '[data-digit="4"]',
+      '5': '[data-digit="5"]',
+      '6': '[data-digit="6"]',
+      '7': '[data-digit="7"]',
+      '8': '[data-digit="8"]',
+      '9': '[data-digit="9"]',
+      '.': '[data-action="decimal"]',
+      '+': '[data-op="+"]',
+      '-': '[data-op="−"]',
+      '*': '[data-op="×"]',
+      '/': '[data-op="÷"]',
+      'Enter': '[data-action="evaluate"]',
+      '=': '[data-action="evaluate"]',
+      'Backspace': '[data-action="backspace"]',
+      'Escape': '[data-action="clear"]',
+      '%': '[data-action="percent"]',
+    };
+    const selector = map[key];
+    return selector ? document.querySelector(selector) : null;
+  }
+
+  /** 버튼 시각적 피드백 */
+  function flashButton(el) {
+    if (!el) return;
+    el.classList.add('active-flash');
+    setTimeout(() => el.classList.remove('active-flash'), 120);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    // 입력 필드가 포커스된 경우 무시 (없지만 안전장치)
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // 브라우저 단축키(새로고침 등) 방지는 최소화
+    const btn = findButtonByKey(e.key);
+
+    switch (e.key) {
+      case '0': case '1': case '2': case '3': case '4':
+      case '5': case '6': case '7': case '8': case '9':
+        flashButton(btn); inputDigit(e.key); break;
+      case '.':
+        flashButton(btn); inputDecimal(); break;
+      case '+':
+        e.preventDefault(); flashButton(btn); chooseOperator('+'); break;
+      case '-':
+        flashButton(btn); chooseOperator('−'); break;
+      case '*':
+        flashButton(btn); chooseOperator('×'); break;
+      case '/':
+        e.preventDefault(); flashButton(btn); chooseOperator('÷'); break;
+      case 'Enter': case '=':
+        e.preventDefault(); flashButton(btn); evaluate(); break;
+      case 'Backspace':
+        flashButton(btn); backspace(); break;
+      case 'Escape':
+        flashButton(btn); clearAll(); break;
+      case '%':
+        flashButton(btn); percent(); break;
+    }
+  });
+
+  /* ============================================================
+     초기 렌더링
+  ============================================================ */
+  renderDisplay();
+  renderHistory();
+</script>
+</body>
+</html>
