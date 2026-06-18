@@ -3,3 +3,5 @@ test-calculator.mjs
 test-*.png
 package.json
 package-lock.json
+live-check.mjs
+live-deploy.png
